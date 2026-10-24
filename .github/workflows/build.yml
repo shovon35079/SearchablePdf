@@ -1,0 +1,44 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unzip project
+        run: |
+          shopt -s nullglob
+          for z in *.zip; do
+            echo "Unzipping $z"
+            unzip -o -q "$z"
+          done
+          if [ -f settings.gradle.kts ] || [ -f settings.gradle ]; then
+            echo "PROJECT_DIR=." >> "$GITHUB_ENV"
+          else
+            f=$(find . -maxdepth 3 -name 'settings.gradle*' | head -n1)
+            echo "PROJECT_DIR=$(dirname "$f")" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.10.2
+
+      - name: Build debug APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug.apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
